@@ -18,6 +18,16 @@ import { Cursor } from "./cursor";
 import { Preloader } from "./preloader";
 import { SaxMark } from "./sax";
 
+declare global {
+  interface Window {
+    Lenis?: new () => {
+      raf: (time: number) => void;
+      on: (event: string, callback: () => void) => void;
+      destroy: () => void;
+    };
+  }
+}
+
 if (typeof window !== "undefined") {
   gsap.registerPlugin(ScrollTrigger);
 }
@@ -85,6 +95,48 @@ export function Portfolio() {
     return () => ctx.revert();
   }, [booting]);
 
+  useEffect(() => {
+    if (booting) return;
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+
+    let dead = false;
+    let lenis: { raf: (time: number) => void; on: (event: string, cb: () => void) => void; destroy: () => void } | null =
+      null;
+    const tick = (time: number) => {
+      lenis?.raf(time * 1000);
+    };
+
+    const boot = () => {
+      const Ctor = window.Lenis;
+      if (dead || !Ctor || lenis) return;
+      lenis = new Ctor();
+      lenis.on("scroll", () => ScrollTrigger.update());
+      gsap.ticker.add(tick);
+      gsap.ticker.lagSmoothing(0);
+      ScrollTrigger.refresh();
+    };
+
+    boot();
+    const script = document.querySelector<HTMLScriptElement>("script[data-lenis]");
+    script?.addEventListener("load", boot);
+    let tries = 0;
+    const wait = window.setInterval(() => {
+      tries += 1;
+      if (window.Lenis || tries > 80) {
+        window.clearInterval(wait);
+        boot();
+      }
+    }, 40);
+
+    return () => {
+      dead = true;
+      window.clearInterval(wait);
+      script?.removeEventListener("load", boot);
+      gsap.ticker.remove(tick);
+      lenis?.destroy();
+    };
+  }, [booting]);
+
   return (
     <>
       <a href="#top" className="skip">
@@ -107,7 +159,7 @@ export function Portfolio() {
       </main>
       <footer className="border-t border-brass/25">
         <div className="wrap flex flex-col gap-3 py-8 font-mono text-xs tracking-widest text-mute sm:flex-row sm:items-center sm:justify-between">
-          <p>© 2026 Daan Roosenbrand</p>
+          <p>© {new Date().getFullYear()} Daan Roosenbrand</p>
           <p>
             Ontworpen door{" "}
             <a
@@ -134,7 +186,7 @@ function Header() {
   const ref = useRef<HTMLAnchorElement>(null);
   return (
     <header className="nav-fade fixed inset-x-0 top-0 z-30">
-      <div className="wrap flex items-center justify-between gap-4 py-4">
+      <nav aria-label="Hoofdnavigatie" className="wrap flex items-center justify-between gap-4 py-4">
         <a href="#top" className="font-mono text-xs tracking-widest text-cream uppercase">
           Daan Roosenbrand
           <span className="hidden md:inline"> — Saxofoon · Klarinet · Dirigent</span>
@@ -158,7 +210,7 @@ function Header() {
           <span className="sm:hidden">Boeken</span>
           <span className="hidden sm:inline">Boek Daan / Contact</span>
         </a>
-      </div>
+      </nav>
     </header>
   );
 }
@@ -206,7 +258,7 @@ function Rail() {
 
 function Hero({ onListen }: { onListen: () => void }) {
   return (
-    <section id="top" className="relative flex min-h-[100svh] flex-col justify-center pt-24 pb-8">
+    <section id="top" aria-labelledby="hero-heading" className="relative flex min-h-[100svh] flex-col justify-center pt-24 pb-8">
       <div id="hero-sax" className="pointer-events-none absolute top-[16%] right-[6%] hidden h-72 w-32 text-brass/30 lg:block">
         <SaxMark className="h-full w-full" />
       </div>
@@ -217,16 +269,20 @@ function Hero({ onListen }: { onListen: () => void }) {
               Rotterdam — Codarts
             </p>
             <p className="kicker mb-6 lg:pl-10">01 — Het geluid van Rotterdam</p>
-            <h1 className="display lg:pl-10">
-              <span className="block">Adem.</span>
-              <span className="block pl-6 md:pl-14">Koper.</span>
-              <span className="block pl-8 text-brass italic md:pl-14">Ziel.</span>
+            <h1 id="hero-heading" className="lg:pl-10">
+              <span className="display block">Adem.</span>
+              <span className="display block pl-6 md:pl-14">Koper.</span>
+              <span className="display block pl-8 text-brass italic md:pl-14">Ziel.</span>
+              <span className="mt-5 block max-w-md font-sans text-base leading-snug font-normal tracking-normal text-mute normal-case not-italic md:text-lg">
+                Saxofonist Rotterdam — solo, Sax & DJ en klarinet.
+              </span>
             </h1>
             <p className="mt-8 font-serif text-3xl tracking-tight md:text-5xl lg:pl-10">Daan Roosenbrand</p>
             <p className="mt-5 max-w-md text-base leading-relaxed text-mute md:text-lg lg:pl-10">
-              Professioneel saxofonist, klarinettist, dirigent en docent. Geboren, getogen en gevormd in Rotterdam
+              Professioneel saxofonist, klarinettist, dirigent en docent. Geboren en gevormd in Rotterdam
               <span className="age">{DAAN_AGE}</span>
-              jaar.
+              jaar. Saxofonist boeken voor een solo of met een dj. Saxofoonles Papendrecht, saxofoonles Oud Gastel,
+              bigband-dirigent Delft, Codarts-saxofonist.
             </p>
           </div>
           <figure className="relative lg:col-span-5">
@@ -234,7 +290,10 @@ function Hero({ onListen }: { onListen: () => void }) {
             <div className="hero-frame bg-char">
               <img
                 src="/photos/blue.jpg"
-                alt="Daan Roosenbrand speelt saxofoon in blauw podiumlicht"
+                alt="Daan Roosenbrand, saxofonist Rotterdam, speelt saxofoon in blauw podiumlicht"
+                width={960}
+                height={960}
+                fetchPriority="high"
                 className="crop-blue h-full w-full object-cover"
               />
               <span className="vignette pointer-events-none absolute inset-0" />
@@ -248,6 +307,7 @@ function Hero({ onListen }: { onListen: () => void }) {
         <button
           type="button"
           data-cursor="LUISTER"
+          aria-label="Luister naar de saxofoonsolo van Baker Street"
           onClick={onListen}
           className="group mt-10 flex w-full items-center gap-4 border-t border-b border-brass/30 py-5 text-left lg:mt-12"
         >
@@ -314,11 +374,16 @@ function Story() {
   }, []);
 
   return (
-    <section id="verhaal" className="py-24 md:py-32">
-      <div className="wrap grid gap-12 lg:grid-cols-12">
+    <section id="verhaal" aria-labelledby="verhaal-heading" className="py-24 md:py-32">
+      <div className="wrap">
+        <p className="kicker">02 — Verhaal</p>
+        <h2 id="verhaal-heading" className="display-md mt-3 max-w-3xl italic">
+          Een Codarts-saxofonist uit Rotterdam
+        </h2>
+        <div className="mt-12 grid gap-12 lg:grid-cols-12">
         <div className="lg:col-span-5">
           <div className="lg:sticky lg:top-28">
-            <p className="kicker mb-4">02 — Verhaal</p>
+            <p className="kicker mb-4">Beeld</p>
             <div className="relative">
               <Corners />
               <div className="ratio-portrait relative overflow-hidden bg-char">
@@ -341,25 +406,26 @@ function Story() {
         </div>
         <div className="space-y-20 lg:col-span-6 lg:col-start-7 lg:pt-16">
           <article data-chapter="0" className="chapter">
-            <p className="kicker mb-5">De muzikant</p>
+            <h3 className="kicker mb-5 font-normal">De muzikant</h3>
             <p data-ink className="text-xl leading-relaxed text-cream md:text-2xl">
               Daan Roosenbrand
               <span className="age">{DAAN_AGE}</span>
-              is Rotterdammer. Afgestudeerd aan Codarts, saxofonist én klarinettist, met een voorliefde voor lichte muziek. Zijn carrière loopt door zalen, bigbands en clubs — niet langs één genre.
+              is Rotterdammer en Codarts-saxofonist. Saxofonist én klarinettist, met een voorliefde voor lichte muziek. Zijn carrière loopt door zalen, bigbands en clubs — niet langs één genre.
             </p>
           </article>
           <article data-chapter="1" className="chapter">
-            <p className="kicker mb-5">Bands, podium, dj's</p>
+            <h3 className="kicker mb-5 font-normal">Bands, podium, dj's</h3>
             <p data-ink className="text-xl leading-relaxed text-cream md:text-2xl">
-              Hij was gewaardeerd lid van de Dave Warmerdam Band, waar zijn toon scherper werd. Nu speelt hij bij de coverband IMPAKT uit Roosendaal en bij Night at the Jukebox. Met dj's staat hij op feesten, in clubs en op bedrijfsevents: de saxofoon in een andere kamer, even precies.
+              Hij was gewaardeerd lid van de Dave Warmerdam Band, waar zijn toon scherper werd. Nu speelt hij bij de coverband IMPAKT uit Roosendaal en bij Night at the Jukebox. Sax & DJ: live op feesten, in clubs en op bedrijfsevents. Saxofonist boeken kan solo of met een dj, in regio Rotterdam.
             </p>
           </article>
           <article data-chapter="2" className="chapter">
-            <p className="kicker mb-5">Dirigent en docent</p>
+            <h3 className="kicker mb-5 font-normal">Dirigent en docent</h3>
             <p data-ink className="text-xl leading-relaxed text-cream md:text-2xl">
-              Directie en lesgeven horen bij hetzelfde vak. Let's Swing Delft en JD's Big Band. Saxofoonles bij Excelsior Papendrecht — waar hij ook solist is — en sinds 2023 bij Gastels Fanfare. Privéles klarinet en saxofoon, en muziek op basisscholen. Plezier is het uitgangspunt.
+              Directie en lesgeven horen bij hetzelfde vak. Bigband-dirigent Delft bij Let's Swing Delft, en JD's Big Band. Saxofoonles Papendrecht bij Excelsior — waar hij ook solist is — en saxofoonles Oud Gastel bij Gastels Fanfare, sinds 2023. Privéles klarinet en saxofoon, en muziek op basisscholen. Plezier is het uitgangspunt.
             </p>
           </article>
+        </div>
         </div>
       </div>
     </section>
@@ -405,12 +471,15 @@ function Vault() {
   };
 
   return (
-    <section id="zaal" className="bg-char py-24 md:py-32">
+    <section id="zaal" aria-labelledby="zaal-heading" className="bg-char py-24 md:py-32">
       <div className="wrap">
         <div className="flex flex-col gap-8 md:flex-row md:items-end md:justify-between">
           <div>
             <p className="kicker">03 — Live on stage & in session</p>
-            <h2 className="display-md mt-3 italic">De luisterzaal</h2>
+            <h2 id="zaal-heading" className="display-md mt-3 italic">De luisterzaal</h2>
+            <p className="mt-4 max-w-md text-mute">
+              Solo, Codarts Pop Orchestra en Excelsior. Een Codarts-saxofonist, live.
+            </p>
           </div>
           <div className="flex flex-wrap gap-x-5 gap-y-2" role="tablist" aria-label="Filter optredens">
             {FILTERS.map((item) => {
@@ -421,6 +490,7 @@ function Vault() {
                   type="button"
                   role="tab"
                   aria-selected={selected}
+                  aria-label={`Filter: ${item.label}`}
                   onClick={() => choose(item.id)}
                   className={`min-h-11 border-b py-2 font-mono text-xs tracking-widest uppercase ${selected ? "border-brass text-brass" : "border-transparent text-mute"}`}
                 >
@@ -432,7 +502,7 @@ function Vault() {
         </div>
 
         {active ? (
-          <div className="mt-12 grid items-end gap-8 lg:grid-cols-12">
+          <article className="mt-12 grid items-end gap-8 lg:grid-cols-12">
             <div className="lg:col-span-5">
               <p className="kicker">{active.label}</p>
               <h3 className="mt-4 font-serif text-4xl leading-none md:text-5xl">{active.title}</h3>
@@ -461,7 +531,7 @@ function Vault() {
             >
               <Corners />
               <span className="relative block aspect-video overflow-hidden bg-pitch">
-                <Thumb id={active.id} alt="" />
+                <Thumb id={active.id} alt={active.alt} />
                 <span className="vignette-soft absolute inset-0" />
                 <span className="absolute inset-0 grid place-items-center">
                   <span className="grid size-20 place-items-center rounded-full border border-brass bg-pitch/50 text-brass">
@@ -470,28 +540,29 @@ function Vault() {
                 </span>
               </span>
             </button>
-          </div>
+          </article>
         ) : null}
 
         <div className="mt-8 flex gap-3 overflow-x-auto pb-2">
           {shown.map((video, index) => {
             const selected = video.id === active?.id;
             return (
+              <article key={video.id} className="w-40 shrink-0 md:w-52">
               <button
-                key={video.id}
                 type="button"
                 onClick={() => setActiveId(video.id)}
                 aria-current={selected ? "true" : undefined}
-                aria-label={video.title}
-                className={`w-40 shrink-0 text-left md:w-52 ${selected ? "opacity-100" : "opacity-55"}`}
+                aria-label={`Bekijk ${video.title}`}
+                className={`w-full text-left ${selected ? "opacity-100" : "opacity-55"}`}
               >
                 <span className={`block aspect-video overflow-hidden border ${selected ? "border-brass" : "border-brass/20"}`}>
-                  <Thumb id={video.id} alt="" />
+                  <Thumb id={video.id} alt={video.alt} />
                 </span>
-                <span className="mt-2 block font-mono text-xs tracking-widest text-mute">
-                  {String(index + 1).padStart(2, "0")}
+                <span className="mt-2 block font-mono text-[0.65rem] leading-relaxed tracking-widest text-mute uppercase">
+                  {String(index + 1).padStart(2, "0")} · {video.label}
                 </span>
               </button>
+              </article>
             );
           })}
         </div>
@@ -506,6 +577,10 @@ function Thumb({ id, alt }: { id: string; alt: string }) {
     <img
       src={`https://i.ytimg.com/vi/${id}/hqdefault.jpg`}
       alt={alt}
+      width={1280}
+      height={720}
+      loading="lazy"
+      decoding="async"
       className="h-full w-full object-cover"
     />
   );
@@ -533,7 +608,7 @@ function Cinema({ id, onClose }: { id: string; onClose: () => void }) {
     <div className="z-cinema fixed inset-0 flex flex-col bg-pitch/95" role="dialog" aria-modal="true" aria-label={video?.title ?? "Video"} onClick={onClose}>
       <div className="wrap flex items-center justify-between py-4">
         <p className="kicker">{video?.label}</p>
-        <button type="button" onClick={onClose} className="kicker min-h-11 text-cream">
+        <button type="button" onClick={onClose} aria-label="Sluit video" className="kicker min-h-11 text-cream">
           Sluiten
         </button>
       </div>
@@ -554,10 +629,10 @@ function Cinema({ id, onClose }: { id: string; onClose: () => void }) {
 
 function Bands() {
   return (
-    <section id="bands" className="py-24 md:py-32">
+    <section id="bands" aria-labelledby="bands-heading" className="py-24 md:py-32">
       <div className="wrap">
         <p className="kicker">04 — Samen</p>
-        <h2 className="display-md mt-3 max-w-3xl italic">Bands, projecten & samenwerkingen</h2>
+        <h2 id="bands-heading" className="display-md mt-3 max-w-3xl italic">Bands, Sax & DJ en samenwerkingen</h2>
         <div className="mt-12 border-b border-brass/25">
           {BANDS.map((band, index) => (
             <article key={band.name} className="group border-t border-brass/25 py-8">
@@ -586,10 +661,10 @@ function Bands() {
 
 function Score() {
   return (
-    <section id="directie" className="pb-24 md:pb-32">
+    <section id="directie" aria-labelledby="directie-heading" className="pb-24 md:pb-32">
       <div className="wrap">
         <p className="kicker">05 — Meesterschap</p>
-        <h2 className="display-md mt-3 max-w-3xl italic">Directie, educatie & vak</h2>
+        <h2 id="directie-heading" className="display-md mt-3 max-w-3xl italic">Bigband-dirigent, saxofoonles en vak</h2>
         <p className="mt-5 max-w-xl text-mute">
           Kennis en passie delen, met het plezier in muziek als maat.
         </p>
@@ -627,15 +702,17 @@ function Contact() {
   };
 
   return (
-    <section id="contact" className="bg-char py-24 md:py-32">
+    <section id="contact" aria-labelledby="contact-heading" className="bg-char py-24 md:py-32">
       <div className="wrap grid gap-14 lg:grid-cols-12">
         <div className="lg:col-span-5">
           <p className="kicker">06 — Bericht</p>
-          <h2 className="display-md mt-4 italic">Zullen we samen muziek maken?</h2>
+          <h2 id="contact-heading" className="display-md mt-4 italic">Zullen we samen muziek maken?</h2>
           <p className="mt-5 max-w-sm text-mute">Kies een of meer onderwerpen. Daarna naam, contact en — als je wilt — een datum.</p>
           <img
             src="/photos/portrait.jpg"
-            alt="Portret van Daan Roosenbrand"
+            alt="Portret van saxofonist Daan Roosenbrand"
+            width={400}
+            height={400}
             className="mt-8 h-40 w-40 border border-brass object-cover"
           />
         </div>

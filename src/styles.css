@@ -279,6 +279,11 @@
   transform: rotate(180deg);
 }
 
+html.lenis,
+html.lenis body {
+  height: auto;
+}
+
 .skip {
   position: absolute;
   left: -999px;
