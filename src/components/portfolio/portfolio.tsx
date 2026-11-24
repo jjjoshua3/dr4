@@ -5,7 +5,7 @@ import { ScrollTrigger } from "gsap/ScrollTrigger";
 import {
   BANDS,
   CHAPTERS,
-  DAAN_AGE,
+  daanAge,
   FILTERS,
   RAIL,
   SCORE,
@@ -280,7 +280,7 @@ function Hero({ onListen }: { onListen: () => void }) {
             <p className="mt-8 font-serif text-3xl tracking-tight md:text-5xl lg:pl-10">Daan Roosenbrand</p>
             <p className="mt-5 max-w-md text-base leading-relaxed text-mute md:text-lg lg:pl-10">
               Professioneel saxofonist, klarinettist, dirigent en docent. Geboren en gevormd in Rotterdam
-              <span className="age">{DAAN_AGE}</span>
+              <span className="age">{daanAge()}</span>
               jaar. Saxofonist boeken voor een solo of met een dj. Saxofoonles Papendrecht, saxofoonles Oud Gastel,
               bigband-dirigent Delft, Codarts-saxofonist.
             </p>
@@ -409,7 +409,7 @@ function Story() {
             <h3 className="kicker mb-5 font-normal">De muzikant</h3>
             <p data-ink className="text-xl leading-relaxed text-cream md:text-2xl">
               Daan Roosenbrand
-              <span className="age">{DAAN_AGE}</span>
+              <span className="age">{daanAge()}</span>
               is Rotterdammer en Codarts-saxofonist. Saxofonist én klarinettist, met een voorliefde voor lichte muziek. Zijn carrière loopt door zalen, bigbands en clubs — niet langs één genre.
             </p>
           </article>

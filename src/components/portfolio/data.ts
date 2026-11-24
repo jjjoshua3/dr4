@@ -1,5 +1,21 @@
-/** Pas alleen deze waarde aan om de leeftijd op de hele site te wijzigen. */
-export const DAAN_AGE = "[XX]";
+/** Geboortedatum. De leeftijd op de site volgt hieruit, ook na een verjaardag. */
+export const DAAN_BORN = { year: 2001, month: 7, day: 2 } as const;
+
+export function daanAge(now = new Date()): number {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "Europe/Amsterdam",
+    year: "numeric",
+    month: "numeric",
+    day: "numeric",
+  }).formatToParts(now);
+  const pick = (type: string) => Number(parts.find((part) => part.type === type)?.value);
+  const year = pick("year");
+  const month = pick("month");
+  const day = pick("day");
+  let age = year - DAAN_BORN.year;
+  if (month < DAAN_BORN.month || (month === DAAN_BORN.month && day < DAAN_BORN.day)) age -= 1;
+  return age;
+}
 
 export type Tag = "solo" | "bands" | "codarts" | "excelsior";
 export type FilterId = "all" | Tag;
